@@ -51,6 +51,17 @@ export class RestServer {
         this.router.use(stripEmptyBearerToken);
         this.router.use(Restify.dateParser());
         this.router.use(Restify.queryParser());
+
+        var corsMiddleware = require('restify-cors-middleware');
+        var cors = corsMiddleware({
+            preflightMaxAge: 5, //Optional
+            origins: ['*'],
+            allowHeaders: ['Authorization'],
+            //exposeHeaders: ['API-Token-Expiry']
+        });
+
+        this.router.pre(cors.preflight);
+        this.router.use(cors.actual);
     }
 
     public restart() {
