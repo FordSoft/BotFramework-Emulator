@@ -47,6 +47,7 @@ import * as Formidable from 'formidable';
 import { RestServer } from '../../restServer';
 import { jsonBodyParser } from '../../jsonBodyParser';
 import { usersDefault } from '../../../types/serverSettingsTypes';
+import { IUser } from "../../../types/userTypes";
 
 
 export class ConversationsControllerV3 {
@@ -71,6 +72,9 @@ export class ConversationsControllerV3 {
         if (activeBot) {
             let created = false;
             const auth = req.header('Authorization');
+            let botid = req.header('BotId');
+            let userid = req.header('UserId');
+            
             const tokenMatch = /Bearer\s+(.+)/.exec(auth);
             const conversationId = tokenMatch[1];
             const users = getSettings().users;
@@ -87,7 +91,7 @@ export class ConversationsControllerV3 {
             }
             let conversation = emulator.conversations.conversationById(activeBot.botId, conversationId);
             if (!conversation) {
-                conversation = emulator.conversations.newConversation(activeBot.botId, currentUser, conversationId);
+                conversation = emulator.conversations.newConversation(activeBot.botId, currentUser, conversationId, botid);
                 // Send "bot added to conversation"
                 conversation.sendConversationUpdate([{ id: activeBot.botId, name: "Bot" }], undefined);
                 // Send "user added to conversation"

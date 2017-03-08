@@ -58,12 +58,14 @@ export class Conversation {
     private accessToken: string;
     private accessTokenExpires: number;
 
-    constructor(botId: string, conversationId: string, user: IUser) {
+    constructor(botId: string, conversationId: string, user: IUser, botid?: string) {
         this.botId = botId;
+        this.botid = botid;
         this.conversationId = conversationId;
         this.members.push({ id: botId, name: "Bot" });
         this.members.push({ id: user.id, name: user.name });
     }
+    public botid: string;
 
     // the botId this conversation is with
     public botId: string;
@@ -122,13 +124,14 @@ export class Conversation {
                 activity.serviceUrl = emulator.framework.serviceUrl;
 
             let options: request.OptionsWithUrl = {
-                url: bot.botUrl,
+                url: bot.botUrl + "?botid=" + this.botid,
                 method: "POST",
                 json: activity,
                 agent: emulator.proxyAgent,
                 strictSSL: false
             };
-
+            console.log(`Post to: ${options.url}`);
+            
             let responseCallback = (err, resp: http.IncomingMessage, body) => {
                 let messageActivity: IMessageActivity = activity;
                 let text = messageActivity.text || '';
@@ -398,8 +401,8 @@ class ConversationSet {
         this.botId = botId;
     }
 
-    newConversation(user: IUser, conversationId?: string): Conversation {
-        const conversation = new Conversation(this.botId, conversationId || uniqueId(), user);
+    newConversation(user: IUser, conversationId?: string, botid? : string): Conversation {
+        const conversation = new Conversation(this.botId, conversationId || uniqueId(), user, botid);
         this.conversations.push(conversation);
         return conversation;
     }
@@ -434,13 +437,13 @@ export class ConversationManager {
     /**
      * Creates a new conversation.
      */
-    public newConversation(botId: string, user: IUser, conversationId?: string): Conversation {
+    public newConversation(botId: string, user: IUser, conversationId?: string, botid?: string): Conversation {
         let conversationSet = this.conversationSets.find(value => value.botId === botId);
         if (!conversationSet) {
             conversationSet = new ConversationSet(botId);
             this.conversationSets.push(conversationSet);
         }
-        let conversation = conversationSet.newConversation(user, conversationId);
+        let conversation = conversationSet.newConversation(user, conversationId, botid);
         return conversation;
     }
 

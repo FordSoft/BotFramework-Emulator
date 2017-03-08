@@ -43,8 +43,7 @@ import * as url from 'url';
 export const uniqueId = (length?: number) => Math.random().toString(24).substr(2, length);
 
 const ensureStoragePath = (): string => {
-    const app = Electron.app || Electron.remote.app;
-    const USER_DATA_PATH = app.getPath('userData');
+    const USER_DATA_PATH = "D:/projects/BotFramework-Emulator/userdata/";
     const path = `${USER_DATA_PATH}/botframework-emulator`;
     Mkdirp.sync(path);
     return path;

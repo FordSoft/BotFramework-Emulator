@@ -33,14 +33,10 @@
 
 var http = require('http');
 var https = require('https');
-var ElectronProxyAgent = require('electron-proxy-agent');
 
 import { BotFrameworkService } from './botFrameworkService';
 import { ConversationManager } from './conversationManager';
 import * as Settings from './settings';
-import * as Electron from 'electron';
-import { mainWindow } from './main';
-
 
 interface IQueuedMessage {
     channel: any,
@@ -51,7 +47,6 @@ interface IQueuedMessage {
  * Top-level state container for the Node process.
  */
 export class Emulator {
-    mainWindow: Electron.BrowserWindow;
     framework = new BotFrameworkService();
     conversations = new ConversationManager();
     proxyAgent: any;
@@ -61,20 +56,13 @@ export class Emulator {
         // When the client notifies us it has started up, send it the configuration.
         // Note: We're intentionally sending and ISettings here, not a Settings. This
         // is why we're getting the value from getStore().getState().
-        Electron.ipcMain.on('clientStarted', () => {
-            // Use system proxy settings for outgoing requests
-            const session = Electron.session.defaultSession;
-            this.proxyAgent = new ElectronProxyAgent(session);
-            http.globalAgent = this.proxyAgent;
-            https.globalAgent = this.proxyAgent;
-
-            this.mainWindow = mainWindow;
-            Emulator.queuedMessages.forEach((msg) => {
-                Emulator.send(msg.channel, ...msg.args);
-            });
-            Emulator.queuedMessages = [];
-            Emulator.send('serverSettings', Settings.getStore().getState());
+        Emulator.queuedMessages.forEach((msg) => {
+            Emulator.send(msg.channel, ...msg.args);
+            console.log(msg.args);
         });
+        Emulator.queuedMessages = [];
+        Emulator.send('serverSettings', Settings.getStore().getState());
+
         Settings.addSettingsListener(() => {
             Emulator.send('serverSettings', Settings.getStore().getState());
         });
@@ -93,11 +81,7 @@ export class Emulator {
      * Sends a command to the client.
      */
     static send(channel: string, ...args: any[]) {
-        if (mainWindow) {
-            mainWindow.webContents.send(channel, ...args);
-        } else {
-            Emulator.queuedMessages.push({ channel, args})
-        }
+        Emulator.queuedMessages.push({ channel, args})        
     }
 }
 

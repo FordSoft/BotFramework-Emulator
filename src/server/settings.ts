@@ -116,14 +116,15 @@ export const addSettingsListener = (actor: SettingsActor) => {
 
 export const startup = () => {
     // Listen for settings change requests from the client.
-    Electron.ipcMain.on('serverChangeSetting', (event, ...args) => {
+    /*Electron.ipcMain.on('serverChangeSetting', (event, ...args) => {
         // Apply change requests to the settings store.
         getStore().dispatch({
             type: args[0],
             state: args[1]
         });
     });
-
+    */
+    
     // Guard against calling getSettings before startup.
     started = true;
     // When changes to settings are made, save to disk.

@@ -100,6 +100,7 @@ export class BotFrameworkService extends RestServer {
         this.ngrokPath = settings.framework.ngrokPath;
         const prevServiceUrl = this.serviceUrl;
         this.localhostServiceUrl = `http://localhost:${port}`;
+        console.log(`Try connect to: ${this.localhostServiceUrl}`);
         this.inspectUrl = null;
         this.ngrokServiceUrl = null;
         const startNgrok = () => {

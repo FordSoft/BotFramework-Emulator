@@ -31,10 +31,9 @@
 // WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 
-import * as Electron from 'electron';
-import { Menu } from 'electron';
+
 import { getSettings, dispatch } from './settings';
-import { WindowStateAction } from './reducers/windowStateReducer';
+import * as Settings from './settings';
 import * as url from 'url';
 import * as path from 'path';
 import * as log from './log';
@@ -46,126 +45,23 @@ process.on('uncaughtException', (error: Error) => {
     log.error('[err-server]', error.message.toString(), JSON.stringify(error.stack));
 });
 
-export let mainWindow: Electron.BrowserWindow;
 
-const createMainWindow = () => {
-
-    const windowTitle = "Bot Framework Channel Emulator";
-
-    // TODO: Make a better/safer window state restoration module
-    // (handles change in display dimensions, maximized state, etc)
-    const safeLowerBound = (val: any, lowerBound: number) => {
-        if (typeof (val) === 'number') {
-            return Math.max(lowerBound, val);
-        }
-    }
-    const settings = getSettings();
-    mainWindow = new Electron.BrowserWindow(
-        {
-            show: false,
-            backgroundColor: '#f7f7f7',
-            width: safeLowerBound(settings.windowState.width, 0),
-            height: safeLowerBound(settings.windowState.height, 0),
-            x: safeLowerBound(settings.windowState.left, 0),
-            y: safeLowerBound(settings.windowState.top, 0),
-            webPreferences: {
-                directWrite: false
+Emulator.startup();
+setTimeout(function(){
+    Settings.getStore().dispatch({
+        type: 'Bots_AddOrUpdateBot',
+        state: {
+            bot: {
+                botId : 'g33398m2g97e03ni9',
+                botUrl: 'http://localhost:9090/api/messages'
             }
-        });
-    mainWindow.setTitle(windowTitle);
-
-    //mainWindow.webContents.openDevTools();
-
-    if (process.platform === 'darwin') {
-        // Create the Application's main menu
-        var template: Electron.MenuItemOptions[] = [
-            {
-                label: windowTitle,
-                submenu: [
-                    { label: "About", click: () => Emulator.send('show-about') },
-                    { type: "separator" },
-                    { label: "Quit", accelerator: "Command+Q", click: () => Electron.app.quit() }
-                ]
-            }, {
-            label: "Edit",
-            submenu: [
-                { label: "Undo", accelerator: "CmdOrCtrl+Z", role: "undo" },
-                { label: "Redo", accelerator: "Shift+CmdOrCtrl+Z", role: "redo" },
-                { type: "separator" },
-                { label: "Cut", accelerator: "CmdOrCtrl+X", role: "cut" },
-                { label: "Copy", accelerator: "CmdOrCtrl+C", role: "copy" },
-                { label: "Paste", accelerator: "CmdOrCtrl+V", role: "paste" },
-                { label: "Select All", accelerator: "CmdOrCtrl+A", role: "selectall" }
-            ]}
-        ];
-        Menu.setApplicationMenu(Menu.buildFromTemplate(template));
-    } else {
-        Menu.setApplicationMenu(null);
-    }
-
-    mainWindow.on('resize', () => {
-        const bounds = mainWindow.getBounds();
-        dispatch<WindowStateAction>({
-            type: 'Window_RememberBounds',
-            state: {
-                width: bounds.width,
-                height: bounds.height,
-                left: bounds.x,
-                top: bounds.y
-            }
-        });
-    });
-    mainWindow.on('move', () => {
-        const bounds = mainWindow.getBounds();
-        dispatch<WindowStateAction>({
-            type: 'Window_RememberBounds',
-            state: {
-                width: bounds.width,
-                height: bounds.height,
-                left: bounds.x,
-                top: bounds.y
-            }
-        });
-    });
-    mainWindow.on('closed', function () {
-        mainWindow = null;
-    });
-
-    mainWindow.once('ready-to-show', () => {
-        mainWindow.show();
-    });
-    let page = url.format({
-        protocol: 'file',
-        slashes: true,
-        pathname: path.join(__dirname, '../client/index.html')
-    });
-    mainWindow.loadURL(page);
-}
-
-const shouldQuit = Electron.app.makeSingleInstance((commandLine, workingDirectory) => {
-    if (mainWindow) {
-        if (mainWindow.isMinimized())
-            mainWindow.restore();
-        mainWindow.focus();
-    }
-});
-
-if (shouldQuit) {
-    Electron.app.quit();
-} else {
-    Emulator.startup();
-    Electron.app.on('ready', createMainWindow);
-    Electron.app.on('window-all-closed', function () {
-        if (process.platform !== 'darwin') {
-            Electron.app.quit();
         }
     });
-    Electron.app.on('activate', function () {
-        if (mainWindow === null) {
-            createMainWindow();
+
+    Settings.getStore().dispatch({
+        type: 'ActiveBot_Set',
+        state: { 
+            botId : 'g33398m2g97e03ni9'                
         }
     });
-}
-
-// Do this last, otherwise startup bugs are harder to diagnose.
-require('electron-debug')();
+}, 1000);

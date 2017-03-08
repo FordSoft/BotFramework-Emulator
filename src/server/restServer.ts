@@ -56,7 +56,7 @@ export class RestServer {
         var cors = corsMiddleware({
             preflightMaxAge: 5, //Optional
             origins: ['*'],
-            allowHeaders: ['Authorization'],
+            allowHeaders: ['Authorization', 'UserId', 'BotId'],
             //exposeHeaders: ['API-Token-Expiry']
         });
 
@@ -66,7 +66,7 @@ export class RestServer {
 
     public restart() {
         this.stop();
-        return this.router.listen();
+        return this.router.listen(28877, 'localhost');
     }
 
     public stop() {
