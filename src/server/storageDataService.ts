@@ -1,7 +1,7 @@
 
 import {MongoClient} from 'mongodb'
 const url = "mongodb://localhost:27017/"
-
+const storagePath =`${url}botStorage`
 
 export enum DataType{
     Message,
@@ -15,19 +15,20 @@ export enum DataType{
  * @param {Function} callback callback function 
  */
 export const saveData = (type:DataType, data:Object, callback:Function)=>{
-    let storagePath = `${url}botStorage`;
-    
     MongoClient.connect(storagePath, function(err, db){
         if(err) {
             callback(err,null);
+            return;
         }
         db.createCollection(`${DataType[type]}s`, function(err, collection){
             if(err) {
                 callback(err,null);
+                return;
             }
             collection.findOne({"_id":data["_id"]}, function(err,res){
                 if(err) {
                     callback(err,null);
+                    return;
                 }
                 collection.save(data, 
                     function(err, res){
@@ -45,15 +46,15 @@ export const saveData = (type:DataType, data:Object, callback:Function)=>{
  * @param {Function} callback callback function
  */
 export const saveMessagesData = (data:Object, callback:Function)=>{
-    let storagePath = `${url}botStorage`;
-    
     MongoClient.connect(storagePath, function(err, db){
         if(err) {
             callback(err,null);
+            return;
         }
         db.createCollection(`${DataType[DataType.Message]}s`, function(err, collection){
             if(err) {
                 callback(err,null);
+                return;
             }
             if(!data["_id"]){
                 collection.save(data, 
@@ -66,6 +67,7 @@ export const saveMessagesData = (data:Object, callback:Function)=>{
             collection.findOne({"_id":data["_id"]}, function(err,res){
                 if(err) {
                     callback(err,null);
+                    return;
                 }
                 if(res){
                     getMaxWatermark(data, (err, maxVal)=>{
@@ -99,10 +101,17 @@ export const saveMessagesData = (data:Object, callback:Function)=>{
  */
 function getMaxWatermark(data:Object, callback:Function){
     let maxVal = 0;
-
-    let storagePath = `${url}botStorage`;
+    
     MongoClient.connect(storagePath, (err, db)=>{
+        if(err){
+            callback(err, null);
+            return;
+        }
         db.collection(`Messages`, (err, collection)=>{
+            if(err){
+                callback(err, null);
+                return;
+            }
             var query = [
                 {$match:{"_id":data["_id"]}},
                 {$unwind:"$messages"},
@@ -135,6 +144,7 @@ export const getDataById = (type:DataType, id:string, callback:Function)=>{
     getDataByQuery(type,{"_id":id}, (err, res)=>{
         if(err){
             callback(err, null);
+            return;
         }
         if(res.length>0){
             callback(err, res[0]);
@@ -150,19 +160,19 @@ export const getDataById = (type:DataType, id:string, callback:Function)=>{
  * @param {DataType} type determinates collection where data is stored
  * @param {string} id criteria of search: the query object with mongo query options
  * @param {Function} callback callback function
- * @param {number} limit limit the number of records
- * @param {number} skip skip the number of records
+ * @param {number} limit [optional] limit the number of records
+ * @param {number} skip [optional] skip the number of records
  */
 export const getDataByQuery = (type:DataType, query:Object, callback:Function, limit?:number, skip?:number)=>{
-    let storagePath = `${url}botStorage`;
-
     MongoClient.connect(storagePath, function(err, db){
         if(err){
             callback(err, null);
+            return;
         }
         db.collection(`${DataType[type]}s`, function(err, collection){
             if(err){
                 callback(err, null);
+                return;
             }
             var cursor = collection.find(query);
             if(skip){
@@ -172,11 +182,81 @@ export const getDataByQuery = (type:DataType, query:Object, callback:Function, l
                 cursor.limit(limit);
             }
             cursor.toArray(function(err, res){
-                console.log(res);
                 callback(err, res)
             });
         });
     });
 };
 
-export const getLastMessages =()=>{};
+/**
+ * Gets the specified amount of last messsages
+ * @param {number} count Count of last readed messages
+ * @param {number} botId Bot identifier
+ * @param {string} conversationId conversation identifier
+ * @param {Function} callback callback function
+ * @param {number} position [optional] last position of readed messages
+ */
+export const getLastMessages =(count:number, botId:number, conversationId:string, callback:Function, position?:number)=>{
+    let id = `${botId}/${conversationId}`;
+    MongoClient.connect(storagePath, function(err, db){
+        if(err){
+            callback(err, null);
+            return;
+        }
+        db.collection(`${DataType[DataType.Message]}s`, function(err, collection){
+            if(err){
+                callback(err, null);
+                return;
+            }
+            countMessages(id, (err, maxSkip)=>{
+                if(err){
+                    callback(err, null);
+                    return;
+                }                
+                let skip = position + count;
+                if(maxSkip<skip){
+                    count = skip - maxSkip;
+                    if(count <0){
+                        count = 0;
+                    }
+                    skip = maxSkip;
+                }
+                let cursor = !position
+                    ? collection.find({"_id": id},{ "messages":{$slice:-count}})
+                    : collection.find({"_id": id},{ "messages":{$slice:[-skip, count]}}); 
+                cursor.toArray(function(err, res){
+                    let msgs = res?res[0]["messages"]:null
+                    callback(err, msgs);
+                });
+            });
+        });
+    });
+};
+
+/**
+ * Gets the count of the messages in document
+ * @param {string} id message document uniquie identifier
+ * @param {Function} callback callback function
+ */
+function countMessages(id:string, callback:Function){
+    MongoClient.connect(storagePath, (err, db)=>{
+        if(err){
+            callback(err, null);
+            return;
+        }
+        db.collection(`Messages`, (err, collection)=>{
+            if(err){
+                callback(err, null);
+                return;
+            }
+            var query = [
+                {$match:{"_id":id}},
+                {$project:{"totalMsg":{$size:"$messages"}}}
+            ];
+            collection.aggregate(query, (err, res)=>{  
+                let total = res && res.length>0 ?res[0]["totalMsg"]:0;
+                callback(err, total);
+            });
+        });
+    });
+}
