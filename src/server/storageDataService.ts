@@ -20,10 +20,63 @@ class StorageDataService{
      */
     public SaveData = saveData;
 
+    /**
+     * Save the new conversation with all messages or updates existing data (insert new messages and updates the last watermark) 
+     * @param {Conversation} data conversation object
+     * @param {Function} callback callback function
+     */
     public SaveActivities = saveActivities;
+
+    /**
+     * Initialize bot conversation
+     * @param {object} data bot conversation object
+     */
+    public InitBotConversation = initBotConversation;
+
+    /**
+     * Get saved data by identifier
+     * @param {DataType} type determinates collection where data is stored
+     * @param {string} id criteria of search: the identifier
+     * @param {Function} callback callback function
+     */
+    public GetDataById = getDataById;
+
+    /**
+     * Get saved data by Qyery (object)
+     * @param {DataType} type determinates collection where data is stored
+     * @param {string} id criteria of search: the query object with mongo query options
+     * @param {Function} callback callback function
+     * @param {number} limit [optional] limit the number of records
+     * @param {number} skip [optional] skip the number of records
+     */
+    public GetDataByQuery = getDataByQuery;
+
+    /**
+     * Gets the specified amount of last messsages
+     * @param {number} position last position of readed messages
+     * @param {number} count Count of last readed messages
+     * @param {string} botId Bot identifier
+     * @param {string} conversationId conversation identifier
+     * @param {Function} callback callback function
+     */
+    public GetLastMessages = getLastMessages;
+
+    /**
+     * Gets the count of the messages in document
+     * @param {string} botid bot uniquie identifier
+     * @param {string} conversationId conversation uniquie identifier
+     * @param {Function} callback callback function
+     */
+    public CountActivities = countActivities;
 }
 
 export const storageDataService = new StorageDataService();
+
+function fakeCallback(err){
+    if(err){
+        throw err;
+    }
+};
 
 /**
  * Save the new data in storage or update existing data (Warning! existing data will overrides)
@@ -32,6 +85,7 @@ export const storageDataService = new StorageDataService();
  * @param {Function} callback callback function 
  */
 function saveData (type:DataType, data:Object, callback:Function){
+    callback = callback ? callback : fakeCallback;
     MongoClient.connect(storagePath, function(err, db){
         if(err) {
             callback(err,null);
@@ -62,7 +116,8 @@ function saveData (type:DataType, data:Object, callback:Function){
  * @param {Conversation} data conversation object
  * @param {Function} callback callback function
  */
-export const saveActivities = (data:Conversation, callback:Function)=>{
+function saveActivities (data:Conversation, callback:Function){
+    callback = callback ? callback : fakeCallback;
     MongoClient.connect(storagePath, function(err, db){
         if(err) {
             callback(err,null);
@@ -126,7 +181,7 @@ export const saveActivities = (data:Conversation, callback:Function)=>{
  * Initialize bot conversation
  * @param {object} data bot conversation object
  */
-export const initBotConversation = (data: Object)=>{
+function initBotConversation (data: Object){
     MongoClient.connect(storagePath, function(err, db){
         if(err) {
             throw err;
@@ -145,7 +200,7 @@ export const initBotConversation = (data: Object)=>{
                             console.log(`Bot ${data["_id"]} document created.`);
                     });
                 }else{
-                    saveActivities(data["conversations"][0], ()=>{});
+                    saveActivities(data["conversations"][0], fakeCallback);
                     console.log(`Bot ${data["_id"]} document exists.`);
                 }
             });
@@ -198,7 +253,7 @@ function getMaxWatermark(data:Object, callback:Function){
  * @param {string} id criteria of search: the identifier
  * @param {Function} callback callback function
  */
-export const getDataById = (type:DataType, id:string, callback:Function)=>{
+function getDataById (type:DataType, id:string, callback:Function){
     getDataByQuery(type,{"_id":id}, (err, res)=>{
         if(err){
             callback(err, null);
@@ -221,7 +276,7 @@ export const getDataById = (type:DataType, id:string, callback:Function)=>{
  * @param {number} limit [optional] limit the number of records
  * @param {number} skip [optional] skip the number of records
  */
-export const getDataByQuery = (type:DataType, query:Object, callback:Function, limit?:number, skip?:number)=>{
+function getDataByQuery (type:DataType, query:Object, callback:Function, limit?:number, skip?:number){
     MongoClient.connect(storagePath, function(err, db){
         if(err){
             callback(err, null);
@@ -248,14 +303,13 @@ export const getDataByQuery = (type:DataType, query:Object, callback:Function, l
 
 /**
  * Gets the specified amount of last messsages
+ * @param {number} position last position of readed messages
  * @param {number} count Count of last readed messages
- * @param {number} botId Bot identifier
+ * @param {string} botId Bot identifier
  * @param {string} conversationId conversation identifier
  * @param {Function} callback callback function
- * @param {number} position [optional] last position of readed messages
  */
-export const getLastMessages =(count:number, botId:number, conversationId:string, callback:Function, position?:number)=>{
-    let id = `${botId}/${conversationId}`;
+function getLastMessages (position:number, count:number, botId:string, conversationId:string, callback:Function){    
     MongoClient.connect(storagePath, function(err, db){
         if(err){
             callback(err, null);
@@ -266,12 +320,12 @@ export const getLastMessages =(count:number, botId:number, conversationId:string
                 callback(err, null);
                 return;
             }
-            countConversations(id, (err, maxSkip)=>{
+            countActivities(botId, conversationId, (err, maxSkip)=>{
                 if(err){
                     callback(err, null);
                     return;
                 }                
-                let skip = position + count;
+                let skip = position;
                 if(maxSkip<skip){
                     count = skip - maxSkip;
                     if(count <0){
@@ -279,11 +333,22 @@ export const getLastMessages =(count:number, botId:number, conversationId:string
                     }
                     skip = maxSkip;
                 }
-                let cursor = !position
-                    ? collection.find({"_id": id},{ "messages":{$slice:-count}})
-                    : collection.find({"_id": id},{ "messages":{$slice:[-skip, count]}}); 
-                cursor.toArray(function(err, res){
-                    let msgs = res?res[0]["messages"]:null
+                let query = [
+                    {$match:{"_id":botId}},
+                    {$unwind:"$conversations"},
+                    {$project:{
+                        "_id":false,
+                        "conversationId":"$conversations.conversationId",
+                        "activities":"$conversations.activities"
+                    }},
+                    {$sort:{"activities.watermark":1}},
+                    {$match:{ "conversationId":conversationId}},
+                    {$project:{
+                        "activities":{$slice:["$activities", -skip, count]}
+                    }}
+                ];
+                collection.aggregate(query, function(err,res){
+                    let msgs = res?res[0]["activities"]:undefined;
                     callback(err, msgs);
                 });
             });
@@ -292,8 +357,8 @@ export const getLastMessages =(count:number, botId:number, conversationId:string
 };
 
 /**
- * Gets the count of the messages in document
- * @param {string} id message document uniquie identifier
+ * Gets the count of the conversations in document
+ * @param {string} id document uniquie identifier
  * @param {Function} callback callback function
  */
 function countConversations(id:string, callback:Function){
@@ -306,6 +371,32 @@ function countConversations(id:string, callback:Function){
         var query = [
             {$match:{"_id":id}},
             {$project:{"total":{$size:"$conversations"}}}
+        ];
+        collection.aggregate(query, (err, res)=>{  
+            let total = res && res.length>0 ?res[0]["total"]:undefined;
+            callback(err, total);
+        });
+    });
+}
+
+/**
+ * Gets the count of the messages in document
+ * @param {string} botid bot uniquie identifier
+ * @param {string} conversationId conversation uniquie identifier
+ * @param {Function} callback callback function
+ */
+function countActivities(botid:string, conversationId:string, callback:Function){
+    MongoClient.connect(storagePath, (err, db)=>{
+        if(err){
+            callback(err, null);
+            return;
+        }
+        let collection = db.collection(`${DataType[DataType.Message]}s`);
+        var query = [
+            {$match:{"_id":botid}},            
+            {$unwind:"$conversations"},
+            {$match:{"conversations.conversationId":conversationId}},
+            {$project:{"total":{$size:"$conversations.activities"}}}
         ];
         collection.aggregate(query, (err, res)=>{  
             let total = res && res.length>0 ?res[0]["total"]:undefined;

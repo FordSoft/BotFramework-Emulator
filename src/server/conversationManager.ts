@@ -50,7 +50,7 @@ import * as log from './log';
 import * as utils from '../utils';
 import { usersDefault } from '../types/serverSettingsTypes';
 import * as moment from 'moment';
-import * as dataService from './storageDataService'
+import {storageDataService, DataType} from './storageDataService'
 
 /**
  * Stores and propagates conversation messages.
@@ -449,7 +449,7 @@ export class ConversationManager {
         if(botid){
             storageData["_id"] = botid;
         }
-        dataService.initBotConversation(storageData);
+        storageDataService.InitBotConversation(storageData);
         return conversation;
     }
 
