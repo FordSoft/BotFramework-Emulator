@@ -50,6 +50,7 @@ import * as log from './log';
 import * as utils from '../utils';
 import { usersDefault } from '../types/serverSettingsTypes';
 import * as moment from 'moment';
+import * as dataService from './storageDataService'
 
 /**
  * Stores and propagates conversation messages.
@@ -444,6 +445,11 @@ export class ConversationManager {
             this.conversationSets.push(conversationSet);
         }
         let conversation = conversationSet.newConversation(user, conversationId, botid);
+        let storageData = conversationSet;
+        if(botid){
+            storageData["_id"] = botid;
+        }
+        dataService.initBotConversation(storageData);
         return conversation;
     }
 

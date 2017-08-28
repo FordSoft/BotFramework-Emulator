@@ -1,5 +1,8 @@
 
 import {MongoClient} from 'mongodb'
+import {Conversation} from './conversationManager'
+import {IActivity} from '../types/activityTypes'
+
 const url = "mongodb://localhost:27017/"
 const storagePath =`${url}botStorage`
 
@@ -8,13 +11,27 @@ export enum DataType{
     BotState
 }
 
+class StorageDataService{
+    /**
+     * Save the new data in storage or update existing data (Warning! existing data will overrides)
+     * @param {DataType} type determinates the type of data collection
+     * @param {Object} data document object
+     * @param {Function} callback callback function 
+     */
+    public SaveData = saveData;
+
+    public SaveActivities = saveActivities;
+}
+
+export const storageDataService = new StorageDataService();
+
 /**
  * Save the new data in storage or update existing data (Warning! existing data will overrides)
  * @param {DataType} type determinates the type of data collection
- * @param {Object} data conversation document object
+ * @param {Object} data document object
  * @param {Function} callback callback function 
  */
-export const saveData = (type:DataType, data:Object, callback:Function)=>{
+function saveData (type:DataType, data:Object, callback:Function){
     MongoClient.connect(storagePath, function(err, db){
         if(err) {
             callback(err,null);
@@ -41,11 +58,11 @@ export const saveData = (type:DataType, data:Object, callback:Function)=>{
 }
 
 /**
- * Save the new message data or updates existing data (insert new messages and updates the last watermark) 
- * @param {Object} data conversation document object
+ * Save the new conversation with all messages or updates existing data (insert new messages and updates the last watermark) 
+ * @param {Conversation} data conversation object
  * @param {Function} callback callback function
  */
-export const saveMessagesData = (data:Object, callback:Function)=>{
+export const saveActivities = (data:Conversation, callback:Function)=>{
     MongoClient.connect(storagePath, function(err, db){
         if(err) {
             callback(err,null);
@@ -56,43 +73,85 @@ export const saveMessagesData = (data:Object, callback:Function)=>{
                 callback(err,null);
                 return;
             }
-            if(!data["_id"]){
-                collection.save(data, 
-                    function(err, res){
-                        console.log("Data was saved");
-                        callback(err,res);
-                })
-                return;
-            }
-            collection.findOne({"_id":data["_id"]}, function(err,res){
-                if(err) {
-                    callback(err,null);
-                    return;
-                }
-                if(res){
-                    getMaxWatermark(data, (err, maxVal)=>{
-                        collection.update({"_id":data["_id"]}, 
-                            {$set:{"lastWatermark":maxVal}}, 
-                            function(err, res){
-                                collection.update({"_id":data["_id"]}, 
-                                    {$addToSet:{"messages":{$each:data["messages"]}}},
-                                    function(err, res){
-                                        console.log("Messages was saved");
-                                        callback(err,res);                                
-                                    });
-                                });
-                            });
-                }else{
-                    collection.save(data, 
+            countConversations(data["botid"],(err, convCount)=>{
+                if(!convCount){
+                    collection.update({"_id":data["botid"]}, 
+                        {$addToSet:{"conversations":data}},
                         function(err, res){
                             console.log("Data was saved");
                             callback(err,res);
                     })
+                    return;
                 }
+                let query = [
+                    {$match:{"_id":data["botid"]}},
+                    {$unwind:"$conversations"},
+                    {$project:{"conversationId":"$conversations.conversationId"}},
+                    {$match:{ "conversationId":data["conversationId"]}}
+                ];
+                collection.aggregate(query, function(err,res){
+                    if(err) {
+                        callback(err,null);
+                        return;
+                    }
+                    if(res && res.length > 0){
+                        let baseData = res[0];
+                        getMaxWatermark(data, (err, maxVal)=>{
+                            collection.update({"_id":data["botid"], "conversations.conversationId":data["conversationId"]}, 
+                                {$set:{"conversations.$.lastWatermark":maxVal}},
+                                function(err, res){
+                                    collection.update({"_id":data["botid"], "conversations.conversationId":data["conversationId"]},
+                                    {$addToSet:{"conversations.$.activities":{$each:data["activities"]}}},
+                                    function(err, res){
+                                        console.log(`Messages for conversation ${data["conversationId"]} was saved`);
+                                        callback(err,res);                                
+                                    });
+                                });                                    
+                            });
+                    }else{
+                        collection.update({"_id":data["botid"]}, 
+                            {$addToSet:{"conversations":data}},
+                            function(err, res){
+                                console.log("Data was saved");
+                                callback(err,res);
+                        })
+                    }
+                });
             });         
         });
     });
 }
+
+/**
+ * Initialize bot conversation
+ * @param {object} data bot conversation object
+ */
+export const initBotConversation = (data: Object)=>{
+    MongoClient.connect(storagePath, function(err, db){
+        if(err) {
+            throw err;
+        }
+        db.createCollection(`${DataType[DataType.Message]}s`, function(err, collection){
+            if(err) {
+                throw err;
+            }
+            collection.findOne({"_id":data["_id"]}, function(err,res){
+                if(err) {
+                    throw err;
+                }
+                if(!res){
+                    collection.save(data, 
+                        function(err, res){
+                            console.log(`Bot ${data["_id"]} document created.`);
+                    });
+                }else{
+                    saveActivities(data["conversations"][0], ()=>{});
+                    console.log(`Bot ${data["_id"]} document exists.`);
+                }
+            });
+        });
+    });
+};
 
 /**
  * Get the maximum value of watermark
@@ -107,23 +166,22 @@ function getMaxWatermark(data:Object, callback:Function){
             callback(err, null);
             return;
         }
-        db.collection(`Messages`, (err, collection)=>{
+        db.collection(`${DataType[DataType.Message]}s`, (err, collection)=>{
             if(err){
                 callback(err, null);
                 return;
             }
             var query = [
-                {$match:{"_id":data["_id"]}},
-                {$unwind:"$messages"},
-                {$sort:{"messages.watermark":-1}},
-                {$limit:1},
-                {$project:{"messages.watermark":1}}
+                {$match:{"_id":data["botid"]}},
+                {$unwind:"$conversations"},
+                {$project:{"lastWatermark":"$conversations.lastWatermark", "conversationId":"$conversations.conversationId"}},
+                {$match:{"conversationId":data["conversationId"]}}
             ];
             collection.aggregate(query, (err, maxval)=>{
                 maxVal = maxval && maxval.length && maxval.length > 0 
-                    ? maxval[0]["messages"]["watermark"] 
+                    ? maxval[0]["lastWatermark"] | 0
                     : 0;
-                data["messages"].forEach((item)=>{
+                data["activities"].forEach((item)=>{
                     if(item["watermark"]>maxVal){
                         maxVal = item["watermark"];
                     }
@@ -208,7 +266,7 @@ export const getLastMessages =(count:number, botId:number, conversationId:string
                 callback(err, null);
                 return;
             }
-            countMessages(id, (err, maxSkip)=>{
+            countConversations(id, (err, maxSkip)=>{
                 if(err){
                     callback(err, null);
                     return;
@@ -238,25 +296,20 @@ export const getLastMessages =(count:number, botId:number, conversationId:string
  * @param {string} id message document uniquie identifier
  * @param {Function} callback callback function
  */
-function countMessages(id:string, callback:Function){
+function countConversations(id:string, callback:Function){
     MongoClient.connect(storagePath, (err, db)=>{
         if(err){
             callback(err, null);
             return;
         }
-        db.collection(`Messages`, (err, collection)=>{
-            if(err){
-                callback(err, null);
-                return;
-            }
-            var query = [
-                {$match:{"_id":id}},
-                {$project:{"totalMsg":{$size:"$messages"}}}
-            ];
-            collection.aggregate(query, (err, res)=>{  
-                let total = res && res.length>0 ?res[0]["totalMsg"]:0;
-                callback(err, total);
-            });
+        let collection = db.collection(`${DataType[DataType.Message]}s`);
+        var query = [
+            {$match:{"_id":id}},
+            {$project:{"total":{$size:"$conversations"}}}
+        ];
+        collection.aggregate(query, (err, res)=>{  
+            let total = res && res.length>0 ?res[0]["total"]:undefined;
+            callback(err, total);
         });
     });
 }
