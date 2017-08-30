@@ -64,4 +64,11 @@ setTimeout(function(){
             botId : 'g33398m2g97e03ni9'                
         }
     });
+
+    Settings.getStore().dispatch({
+        type:'Framework_botStorage_Set',
+        state:{
+            botStoragePath: "mongodb://localhost:27017/botStorage"
+        }
+    });
 }, 1000);

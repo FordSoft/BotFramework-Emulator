@@ -37,7 +37,9 @@ import { IUser } from '../types/userTypes';
 
 export interface IFrameworkSettings {
     // path to use for ngrok
-    ngrokPath?: string
+    ngrokPath?: string,
+    // path to bot storage
+    botStoragePath?: string
 }
 
 export interface IWindowStateSettings {
@@ -84,7 +86,8 @@ export class Settings implements ISettings {
 }
 
 export const frameworkDefault: IFrameworkSettings = {
-    ngrokPath: ''
+    ngrokPath: '',
+    botStoragePath: ''
 }
 
 export const windowStateDefault: IWindowStateSettings = {

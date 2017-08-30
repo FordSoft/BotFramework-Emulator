@@ -2,9 +2,12 @@
 import {MongoClient} from 'mongodb'
 import {Conversation} from './conversationManager'
 import {IActivity} from '../types/activityTypes'
+import * as Settings from './settings'
 
-const url = "mongodb://localhost:27017/"
-const storagePath =`${url}botStorage`
+let storagePath = '';
+setTimeout(()=>{ 
+    storagePath = Settings.getStore().getState().framework.botStoragePath;
+}, 1000);
 
 export enum DataType{
     Message,
@@ -112,7 +115,7 @@ function saveData (type:DataType, data:Object, callback:Function){
                 }
                 collection.save(data, 
                     function(err, res){
-                        console.log("Data was saved");
+                        //console.log("Data was saved");
                         callback(err,res);
                 })
             });         
@@ -142,7 +145,7 @@ function saveActivities (data:Conversation, callback:Function){
                     collection.update({"_id":data["botid"]}, 
                         {$addToSet:{"conversations":data}},
                         function(err, res){
-                            console.log("Data was saved");
+                            //console.log("Data was saved");
                             callback(err,res);
                     })
                     return;
@@ -170,7 +173,7 @@ function saveActivities (data:Conversation, callback:Function){
                                     collection.update({"_id":data["botid"], "conversations.conversationId":data["conversationId"]},
                                     {$addToSet:{"conversations.$.activities":{$each:data["activities"]}}},
                                     function(err, res){
-                                        console.log(`Messages for conversation ${data["conversationId"]} was saved`);
+                                        //console.log(`Messages for conversation ${data["conversationId"]} was saved`);
                                         callback(err,res);                                
                                     });
                                 });                                    
@@ -179,7 +182,7 @@ function saveActivities (data:Conversation, callback:Function){
                         collection.update({"_id":data["botid"]}, 
                             {$addToSet:{"conversations":data}},
                             function(err, res){
-                                console.log("Data was saved");
+                                //console.log("Data was saved");
                                 callback(err,res);
                         })
                     }
@@ -235,7 +238,7 @@ function addActivity(botId:string, conversationId:string, activity:IActivity, ca
                                     collection.update({"_id":botId, "conversations.conversationId":conversationId},
                                     {$addToSet:{"conversations.$.activities":activity}},
                                     function(err, res){
-                                        console.log(`New message for conversation ${conversationId} was saved`);
+                                        //console.log(`New message for conversation ${conversationId} was saved`);
                                         callback(err,res);                                
                                     });
                                 });                                    
@@ -278,12 +281,12 @@ function initBotConversation (data: Object){
                 if(!res){
                     collection.save(data, 
                         function(err, res){
-                            console.log(`Bot ${data["_id"]} document created.`);
+                            //console.log(`Bot ${data["_id"]} document created.`);
                             cacheWatermark(null);
                     });
                 }else{
                     saveActivities(data["conversations"][0], cacheWatermark);
-                    console.log(`Bot ${data["_id"]} document exists.`);
+                    //console.log(`Bot ${data["_id"]} document exists.`);
                 }
             });
         });

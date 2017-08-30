@@ -40,6 +40,11 @@ export type FrameworkAction = {
     state: {
         ngrokPath: string
     }
+} | {
+    type: 'Framework_botStorage_Set',
+    state: {
+        botStoragePath: string
+    }
 }
 
 export const frameworkReducer: Reducer<IFrameworkSettings> = (
@@ -49,6 +54,8 @@ export const frameworkReducer: Reducer<IFrameworkSettings> = (
     switch (action.type) {
         case 'Framework_Set':
             return Object.assign({}, state, action.state);
+        case 'Framework_botStorage_Set':
+            return Object.assign({}, state, {botStoragePath:action.state.botStoragePath})
         default:
             return state
     }
