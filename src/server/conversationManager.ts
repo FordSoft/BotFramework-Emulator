@@ -164,8 +164,11 @@ export class Conversation {
                             log.makeInspectorLink(`${resp.statusCode}`, body, `(${resp.statusMessage})`),
                             `[${activity.type}]`,
                             text);
-                        if (recordInConversation) {
+                        if (recordInConversation) {                            
                             this.activities.push(Object.assign({}, activity));
+                            if(activity.type == "message"){
+                                storageDataService.AddActivity(this.botid, this.conversationId, Object.assign({}, activity),null);
+                            }
                         }
                         cb(null, resp.statusCode, activity.id);
                     }
@@ -210,6 +213,9 @@ export class Conversation {
             activity.from.name = "Bot";
         }
         this.activities.push(activity);
+        if(activity.type == "message"){
+            storageDataService.AddActivity(this.botid, this.conversationId, Object.assign({}, activity),null);
+        }
         return ResponseTypes.createResourceResponse(activity.id);
     }
 
@@ -294,6 +300,13 @@ export class Conversation {
      * Returns activities since the watermark.
      */
     getActivitiesSince(watermark: number): IActivity[] {
+        if(this.activities.filter(value=>value.type === "message").length<1){
+            storageDataService.GetLastMessages(100, 100, this.botid, this.conversationId,(err, res)=>{   
+                res.forEach(element => {
+                    this.activities.push(element);
+                });
+            })
+        }
         return this.activities.slice(watermark);
     }
 
@@ -408,8 +421,9 @@ class ConversationSet {
         return conversation;
     }
 
-    conversationById(conversationId: string): Conversation {
-        return this.conversations.find(value => value.conversationId === conversationId);
+    conversationById(conversationId: string, botid?:string): Conversation {
+        return this.conversations.find(value => value.conversationId === conversationId
+             && (botid?value.botid === botid: true));
     }
 }
 
@@ -445,21 +459,23 @@ export class ConversationManager {
             this.conversationSets.push(conversationSet);
         }
         let conversation = conversationSet.newConversation(user, conversationId, botid);
-        let storageData = conversationSet;
         if(botid){
+            let storageData = Object.assign({},conversationSet);
             storageData["_id"] = botid;
+            storageData.conversations=[];
+            storageData.conversations.push(Object.assign({},conversation));
+            storageDataService.InitBotConversation(storageData);
         }
-        storageDataService.InitBotConversation(storageData);
         return conversation;
     }
 
     /**
      * Gets the existing conversation, or returns undefined.
      */
-    public conversationById(botId: string, conversationId: string): Conversation {
+    public conversationById(botId: string, conversationId: string, botid?:string): Conversation {
         const set = this.conversationSets.find(set => set.botId === botId);
         if (set) {
-            return set.conversationById(conversationId);
+            return set.conversationById(conversationId, botid);
         }
     }
 }

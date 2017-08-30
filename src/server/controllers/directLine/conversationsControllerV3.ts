@@ -89,7 +89,7 @@ export class ConversationsControllerV3 {
                     }
                 })
             }
-            let conversation = emulator.conversations.conversationById(activeBot.botId, conversationId);
+            let conversation = emulator.conversations.conversationById(activeBot.botId, conversationId, botid);
             if (!conversation) {
                 conversation = emulator.conversations.newConversation(activeBot.botId, currentUser, conversationId, botid);
                 // Send "bot added to conversation"
@@ -122,8 +122,9 @@ export class ConversationsControllerV3 {
 
     static reconnectToConversation = (req: Restify.Request, res: Restify.Response, next: Restify.Next): any => {
         const activeBot = getSettings().getActiveBot();
+        let botid = req.header('BotId');
         if (activeBot) {
-            const conversation = emulator.conversations.conversationById(activeBot.botId, req.params.conversationId);
+            const conversation = emulator.conversations.conversationById(activeBot.botId, req.params.conversationId, botid);
             if (conversation) {
                 res.json(HttpStatus.OK, {
                     conversationId: conversation.conversationId,
@@ -145,7 +146,7 @@ export class ConversationsControllerV3 {
     static getActivities = (req: Restify.Request, res: Restify.Response, next: Restify.Next): any => {
         const activeBot = getSettings().getActiveBot();
         if (activeBot) {
-            const conversation = emulator.conversations.conversationById(activeBot.botId, req.params.conversationId);
+            const conversation = emulator.conversations.conversationById(activeBot.botId, req.params.conversationId, req.params.botId);
             if (conversation) {
                 const watermark = Number(req.params.watermark || 0) || 0;
                 const activities = conversation.getActivitiesSince(req.params.watermark);
@@ -166,8 +167,9 @@ export class ConversationsControllerV3 {
 
     static postActivity = (req: Restify.Request, res: Restify.Response, next: Restify.Next): any => {
         const activeBot = getSettings().getActiveBot();
+        let botid = req.header('BotId');
         if (activeBot) {
-            const conversation = emulator.conversations.conversationById(activeBot.botId, req.params.conversationId);
+            const conversation = emulator.conversations.conversationById(activeBot.botId, req.params.conversationId, botid);
             if (conversation) {
                 const activity = <IGenericActivity>req.body;
                 conversation.postActivityToBot(activity, true, (err, statusCode, activityId) => {
@@ -195,8 +197,9 @@ export class ConversationsControllerV3 {
         const settings = getSettings();
         const activeBot = settings.getActiveBot();
         const currentUser = settings.users.usersById[settings.users.currentUserId];
+        let botid = req.header('BotId');
         if (activeBot) {
-            const conversation = emulator.conversations.conversationById(activeBot.botId, req.params.conversationId);
+            const conversation = emulator.conversations.conversationById(activeBot.botId, req.params.conversationId, botid);
             if (conversation) {
                 if (req.getContentType() !== 'multipart/form-data' ||
                     (req.getContentLength() === 0 && !req.isChunked())) {

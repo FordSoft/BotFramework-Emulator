@@ -28,6 +28,15 @@ class StorageDataService{
     public SaveActivities = saveActivities;
 
     /**
+     * Add single activity in conversation
+     * @param {string} botId bot identifier
+     * @param {string} conversationId conversation identifier
+     * @param {IActivity} activity activity object
+     * @param {Function} callback callback function
+     */
+    public AddActivity = addActivity;
+
+    /**
      * Initialize bot conversation
      * @param {object} data bot conversation object
      */
@@ -151,6 +160,9 @@ function saveActivities (data:Conversation, callback:Function){
                     }
                     if(res && res.length > 0){
                         let baseData = res[0];
+                        data["activities"].forEach((item=>{
+                            item["watermark"] = nextWatermark(data["botid"], data["conversationId"]);
+                        }));
                         getMaxWatermark(data, (err, maxVal)=>{
                             collection.update({"_id":data["botid"], "conversations.conversationId":data["conversationId"]}, 
                                 {$set:{"conversations.$.lastWatermark":maxVal}},
@@ -178,10 +190,79 @@ function saveActivities (data:Conversation, callback:Function){
 }
 
 /**
+ * Add single activity in conversation
+ * @param {string} botId bot identifier
+ * @param {string} conversationId conversation identifier
+ * @param {IActivity} activity activity object
+ * @param {Function} callback callback function
+ */
+function addActivity(botId:string, conversationId:string, activity:IActivity, callback:Function){
+    callback = callback ? callback : fakeCallback;
+    MongoClient.connect(storagePath, function(err, db){
+        if(err) {
+            callback(err,null);
+            return;
+        }
+        db.createCollection(`${DataType[DataType.Message]}s`, function(err, collection){
+            if(err) {
+                callback(err,null);
+                return;
+            }
+            countConversations(botId, (err, convCount)=>{
+                if(!convCount){
+                    callback(err, null);
+                    return;
+                }
+                let query = [
+                    {$match:{"_id":botId}},
+                    {$unwind:"$conversations"},
+                    {$project:{"conversationId":"$conversations.conversationId"}},
+                    {$match:{ "conversationId":conversationId}}
+                ];
+                collection.aggregate(query, function(err,res){
+                    if(err) {
+                        callback(err,null);
+                        return;
+                    }
+                    if(res && res.length > 0){                      
+                        activity["watermark"] =  nextWatermark(botId,conversationId);
+                        let baseData = res[0];
+                        baseData.activities = [activity];
+                        getMaxWatermark(baseData, (err, maxVal)=>{
+                            collection.update({"_id":botId, "conversations.conversationId":conversationId}, 
+                                {$set:{"conversations.$.lastWatermark":maxVal}},
+                                function(err, res){
+                                    collection.update({"_id":botId, "conversations.conversationId":conversationId},
+                                    {$addToSet:{"conversations.$.activities":activity}},
+                                    function(err, res){
+                                        console.log(`New message for conversation ${conversationId} was saved`);
+                                        callback(err,res);                                
+                                    });
+                                });                                    
+                            });
+                    }
+                });
+            });         
+        });
+    });
+}
+
+/**
  * Initialize bot conversation
  * @param {object} data bot conversation object
  */
 function initBotConversation (data: Object){
+    let cacheWatermark = (err)=>{
+        if(err){
+            throw err;
+        }
+        getMaxWatermark({"botid":data["_id"], 
+            "conversationId":data["conversations"][0]["conversationId"]}, 
+            (err, lastWatermark)=>{
+                let id = `${data["_id"]}/${data["conversations"][0]["conversationId"]}`;
+                watermarks[id] = lastWatermark;
+            });
+    };
     MongoClient.connect(storagePath, function(err, db){
         if(err) {
             throw err;
@@ -198,9 +279,10 @@ function initBotConversation (data: Object){
                     collection.save(data, 
                         function(err, res){
                             console.log(`Bot ${data["_id"]} document created.`);
+                            cacheWatermark(null);
                     });
                 }else{
-                    saveActivities(data["conversations"][0], fakeCallback);
+                    saveActivities(data["conversations"][0], cacheWatermark);
                     console.log(`Bot ${data["_id"]} document exists.`);
                 }
             });
@@ -234,13 +316,22 @@ function getMaxWatermark(data:Object, callback:Function){
             ];
             collection.aggregate(query, (err, maxval)=>{
                 maxVal = maxval && maxval.length && maxval.length > 0 
-                    ? maxval[0]["lastWatermark"] | 0
+                    ? maxval[0]["lastWatermark"]
                     : 0;
-                data["activities"].forEach((item)=>{
-                    if(item["watermark"]>maxVal){
-                        maxVal = item["watermark"];
-                    }
-                });
+                let cachedWatermark = watermarks[`${data["botid"]}/${data["conversationId"]}`];
+                if(cachedWatermark){
+                    maxval = cachedWatermark > maxVal
+                        ? cachedWatermark
+                        : maxval;
+                }
+                
+                if(data["activities"]){
+                    data["activities"].forEach((item)=>{
+                        if(item["watermark"]>maxVal){
+                            maxVal = item["watermark"];
+                        }
+                    });
+                }
                 callback(err, maxVal);
             });
         });
@@ -403,4 +494,26 @@ function countActivities(botid:string, conversationId:string, callback:Function)
             callback(err, total);
         });
     });
+}
+
+/**
+ * Watermarks cache
+ */
+const watermarks = {};
+
+/**
+ * Fake generator for watermark sequence
+ * @param {string} botid bot Identifier
+ * @param {string} conversationId conversation Identifier
+ */
+function nextWatermark(botid:string, conversationId:string):number{
+    var id = `${botid}/${conversationId}`;
+    var num = watermarks[id]
+    if(num == undefined || num == null){
+        watermarks[id] = 0;
+        return watermarks[id];
+    }else{
+        watermarks[id] += 1;
+        return watermarks[id];
+    }
 }
