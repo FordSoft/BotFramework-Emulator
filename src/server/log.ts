@@ -56,6 +56,8 @@ export const warn = (message: any, ...args: any[]) => {
     sendMessage('log-warn', message, ...args);
 }
 export const error = (message: any, ...args: any[]) => {
+    console.log(`Errors: ${message}`, args);
+
     sendMessage('log-error', message, ...args);
 }
 

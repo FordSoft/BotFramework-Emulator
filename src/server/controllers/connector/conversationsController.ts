@@ -57,21 +57,22 @@ interface IConversationAPIPathParameters {
 export class ConversationsController {
 
     public static registerRoutes(server: RestServer, auth: BotFrameworkAuthentication) {
-        server.router.post('/v3/conversations', [auth.verifyBotFramework], jsonBodyParser(), [this.createConversation]);
-        server.router.post('/v3/conversations/:conversationId/activities', [auth.verifyBotFramework], jsonBodyParser(), [this.sendToConversation]);
-        server.router.post('/v3/conversations/:conversationId/activities/:activityId', [auth.verifyBotFramework], jsonBodyParser(), [this.replyToActivity]);
-        server.router.put('/v3/conversations/:conversationId/activities/:activityId', [auth.verifyBotFramework], jsonBodyParser(), [this.updateActivity]);
-        server.router.del('/v3/conversations/:conversationId/activities/:activityId', auth.verifyBotFramework, this.deleteActivity);
-        server.router.get('/v3/conversations/:conversationId/members', auth.verifyBotFramework, this.getConversationMembers);
-        server.router.get('/v3/conversations/:conversationId/activities/:activityId/members', auth.verifyBotFramework, this.getActivityMembers);
-        server.router.post('/v3/conversations/:conversationId/attachments', [auth.verifyBotFramework], jsonBodyParser(), [this.uploadAttachment]);
+        server.router.post('/v3/conversations', jsonBodyParser(), [this.createConversation]);
+        server.router.post('/v3/conversations/:conversationId/activities', jsonBodyParser(), [this.sendToConversation]);
+        server.router.post('/v3/conversations/:conversationId/activities/:activityId', jsonBodyParser(), [this.replyToActivity]);
+        server.router.put('/v3/conversations/:conversationId/activities/:activityId', jsonBodyParser(), [this.updateActivity]);
+        server.router.del('/v3/conversations/:conversationId/activities/:activityId', this.deleteActivity);
+        server.router.get('/v3/conversations/:conversationId/members', this.getConversationMembers);
+        server.router.get('/v3/conversations/:conversationId/activities/:activityId/members', this.getActivityMembers);
+        server.router.post('/v3/conversations/:conversationId/attachments', jsonBodyParser(), [this.uploadAttachment]);
+    
     }
 
     // Create conversation API
     public static createConversation = (req: Restify.Request, res: Restify.Response, next: Restify.Next): any => {
         let conversationParameters = <IConversationParameters>req.body;
         try {
-            console.log("connector: newConversation");
+            console.log(`connector: newConversation ${conversationParameters.id}`);
 
             const settings = getSettings();
             // look up bot
@@ -145,7 +146,6 @@ export class ConversationsController {
         let activity = <IGenericActivity>req.body;
         try {
             const parms: IConversationAPIPathParameters = req.params;
-            console.log("connector: sendToConversation", JSON.stringify(activity));
 
             // look up bot
             const activeBot = getSettings().getActiveBot();
@@ -176,7 +176,6 @@ export class ConversationsController {
         let activity = <IGenericActivity>req.body;
         try {
             const parms: IConversationAPIPathParameters = req.params;
-            console.log("connector: replyToActivity", JSON.stringify(activity));
 
             // look up bot
             const activeBot = getSettings().getActiveBot();
@@ -211,7 +210,6 @@ export class ConversationsController {
         let activity = <IGenericActivity>req.body;
         try {
             const parms: IConversationAPIPathParameters = req.params;
-            console.log("connector: updateActivity", JSON.stringify(activity));
 
             // look up bot
             const activeBot = getSettings().getActiveBot();
@@ -243,8 +241,7 @@ export class ConversationsController {
     public static deleteActivity = (req: Restify.Request, res: Restify.Response, next: Restify.Next): any => {
         const parms: IConversationAPIPathParameters = req.params;
         try {
-            console.log("connector: deleteActivity", JSON.stringify(parms));
-
+            
             // look up bot
             const activeBot = getSettings().getActiveBot();
             if (!activeBot)
@@ -268,7 +265,6 @@ export class ConversationsController {
 
     // get members of a conversation
     public static getConversationMembers = (req: Restify.Request, res: Restify.Response, next: Restify.Next): any => {
-        console.log("connector: getConversationMembers");
         const parms: IConversationAPIPathParameters = req.params;
         try {
             // look up bot
@@ -293,7 +289,6 @@ export class ConversationsController {
 
     // get members of an activity
     public static getActivityMembers = (req: Restify.Request, res: Restify.Response, next: Restify.Next): any => {
-        console.log("connector: getActivityMembers");
         const parms: IConversationAPIPathParameters = req.params;
         try {
             // look up bot
@@ -319,7 +314,6 @@ export class ConversationsController {
 
     // upload attachment
     public static uploadAttachment = (req: Restify.Request, res: Restify.Response, next: Restify.Next): any => {
-        console.log("connector: uploadAttachment");
         let attachmentData = <IAttachmentData>req.body;
         try {
             // look up bot

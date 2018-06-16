@@ -45,61 +45,65 @@ export class BotFrameworkAuthentication {
     }
 
     public verifyBotFramework = (req: Restify.Request, res: Restify.Response, next: Restify.Next): void => {
-        let token: string;
-        if (req.headers && req.headers.hasOwnProperty('authorization')) {
-            let auth = req.headers['authorization'].trim().split(' ');;
-            if (auth.length == 2 && auth[0].toLowerCase() == 'bearer') {
-                token = auth[1];
+        try {
+            let token: string;
+            if (req.headers && req.headers.hasOwnProperty('authorization')) {
+                let auth = req.headers['authorization'].trim().split(' ');;
+                if (auth.length == 2 && auth[0].toLowerCase() == 'bearer') {
+                    token = auth[1];
+                }
             }
-        }
-        const activeBot = getSettings().getActiveBot();
-        // Verify token
-        if (token) {
-
-            let decoded = jwt.decode(token, { complete: true });
-            this.openIdMetadata.getKey(decoded.header.kid, key => {
-                if (key) {
-                    try {
-                        let verifyOptions = {
-                            jwtId: activeBot.botId,
-                            issuer: authenticationSettings.tokenIssuer,
-                            audience: authenticationSettings.tokenAudience,
-                            clockTolerance: 300
-                        };
-
-                        jwt.verify(token, key, verifyOptions);
-                    } catch (err) {
+            const activeBot = getSettings().getActiveBot();
+            // Verify token
+            if (token) {
+    
+                let decoded = jwt.decode(token, { complete: true });
+                this.openIdMetadata.getKey(decoded.header.kid, key => {
+                    if (key) {
                         try {
-                            // fall back to v3.0 token characteristics
                             let verifyOptions = {
                                 jwtId: activeBot.botId,
-                                issuer: v30AuthenticationSettings.tokenIssuer,
-                                audience: v30AuthenticationSettings.tokenAudience,
+                                issuer: authenticationSettings.tokenIssuer,
+                                audience: authenticationSettings.tokenAudience,
                                 clockTolerance: 300
                             };
-
+    
                             jwt.verify(token, key, verifyOptions);
-                        } catch (err2) {
-                            res.status(401);
-                            res.end();
-                            return;
+                        } catch (err) {
+                            try {
+                                // fall back to v3.0 token characteristics
+                                let verifyOptions = {
+                                    jwtId: activeBot.botId,
+                                    issuer: v30AuthenticationSettings.tokenIssuer,
+                                    audience: v30AuthenticationSettings.tokenAudience,
+                                    clockTolerance: 300
+                                };
+    
+                                jwt.verify(token, key, verifyOptions);
+                            } catch (err2) {
+                                res.status(401);
+                                res.end();
+                                return;
+                            }
                         }
+    
+                        next();
+                    } else {
+                        res.status(500);
+                        res.end();
+                        return;
                     }
-
-                    next();
-                } else {
-                    res.status(500);
-                    res.end();
-                    return;
-                }
-            });
-        } else if (!activeBot.msaAppId && !activeBot.msaPassword) {
-              // Emulator running without auth enabled
-            next();
-        } else {
-            // Token not provided so
-            res.status(401);
-            res.end();
+                });
+            } else if (!activeBot.msaAppId && !activeBot.msaPassword) {
+                  // Emulator running without auth enabled
+                next();
+            } else {
+                // Token not provided so
+                res.status(401);
+                res.end();
+            }
+        } catch (e) {
+            throw e;
         }
     }
 }

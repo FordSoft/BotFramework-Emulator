@@ -75,8 +75,10 @@ export class ConversationsControllerV3 {
             let botid = req.header('BotId');
             let userid = req.header('UserId');
             
-            const tokenMatch = /Bearer\s+(.+)/.exec(auth);
-            const conversationId = tokenMatch[1];
+            //const tokenMatch = /Bearer\s+(.+)/.exec(auth);
+            const uuid = require('uuid/v4');
+            const conversationId = uuid();
+            
             const users = getSettings().users;
             let currentUser = users.usersById[users.currentUserId];
             // TODO: This is a band-aid until state system cleanup
@@ -170,9 +172,10 @@ export class ConversationsControllerV3 {
             const conversation = emulator.conversations.conversationById(activeBot.botId, req.params.conversationId);
             if (conversation) {
                 const activity = <IGenericActivity>req.body;
-                conversation.postActivityToBot(activity, true, (err, statusCode, activityId) => {
+                conversation.postActivityToBot(activity, true, (err, statusCode, activityId, resp) => {
                     if (err || !/^2\d\d$/.test(`${statusCode}`)) {
-                        res.send(statusCode || HttpStatus.INTERNAL_SERVER_ERROR);
+                        const exceptionMessage = resp && resp.body ? JSON.stringify(resp.body) : null;
+                        res.send(statusCode || HttpStatus.INTERNAL_SERVER_ERROR, exceptionMessage);
                     } else {
                         res.send(statusCode, { id: activityId });
                     }

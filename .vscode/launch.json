@@ -3,6 +3,7 @@
     "configurations": [
         {
             "request": "launch",
+            "protocol": "legacy",
             "name": "Launch main.js",
             "type": "node",
             "program": "${workspaceRoot}/app/server/main.js",
