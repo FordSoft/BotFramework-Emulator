@@ -1,0 +1,36 @@
+{
+  "framework": {
+    "ngrokPath": ""
+  },
+  "bots": [
+    {
+      "botId": "default-bot",
+      "botUrl": "http://localhost:3978/api/messages",
+      "msaAppId": "",
+      "msaPassword": ""
+    },
+    {
+      "botId": "g33398m2g97e03ni9",
+      "botUrl": "http://localhost:9091/api/messages"
+    }
+  ],
+  "windowState": {
+    "width": 800,
+    "height": 600,
+    "left": 100,
+    "top": 50
+  },
+  "users": {
+    "currentUserId": "John Doe",
+    "usersById": {
+      "default-user": {
+        "id": "default-user",
+        "name": "User"
+      },
+      "John Doe": {
+        "id": "John Doe",
+        "name": "John Doe"
+      }
+    }
+  }
+}
