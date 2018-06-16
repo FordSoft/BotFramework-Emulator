@@ -9,7 +9,9 @@
             "program": "${workspaceRoot}/app/server/main.js",
             "stopOnEntry": false,
             "args": [
-                "--debug=5858"
+                "--debug=5858",
+                "--bot-port=9091",
+                "--emulator-port=28878"
             ],
             "port": 5858,
             "cwd": "${workspaceRoot}/app/client",

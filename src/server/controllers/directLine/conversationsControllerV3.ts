@@ -157,7 +157,7 @@ export class ConversationsControllerV3 {
                 });
             } else {
                 res.send(HttpStatus.NOT_FOUND, "conversation not found");
-                log.error("DirectLine: Cannot get activities. Conversation not found");
+                //log.error("DirectLine: Cannot get activities. Conversation not found");
             }
         } else {
             res.send(HttpStatus.NOT_FOUND, "no active bot");

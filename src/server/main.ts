@@ -38,6 +38,7 @@ import * as url from 'url';
 import * as path from 'path';
 import * as log from './log';
 import { Emulator, emulator } from './emulator';
+import { EmulatorConfiguration } from './EmulatorConfiguration';
 var pjson = require('../../package.json');
 
 process.on('uncaughtException', (error: Error) => {
@@ -45,6 +46,7 @@ process.on('uncaughtException', (error: Error) => {
     log.error('[err-server]', error.message.toString(), JSON.stringify(error.stack));
 });
 
+EmulatorConfiguration.getInstance().ParseArguments(process.argv);
 
 Emulator.startup();
 setTimeout(function(){
@@ -53,7 +55,7 @@ setTimeout(function(){
         state: {
             bot: {
                 botId : 'g33398m2g97e03ni9',
-                botUrl: 'http://localhost:9090/api/messages'
+                botUrl: `http://localhost:${EmulatorConfiguration.getInstance().BotApplicationPort}/api/messages`
             }
         }
     });

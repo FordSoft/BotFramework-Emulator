@@ -1,0 +1,1 @@
+node.exe app/server/main.js --bot-port=9091 --emulator-port=28878

@@ -33,6 +33,7 @@
 
 import * as Restify from 'restify';
 import * as log from './log';
+import { EmulatorConfiguration } from './EmulatorConfiguration';
 
 
 export class RestServer {
@@ -66,7 +67,7 @@ export class RestServer {
 
     public restart() {
         this.stop();
-        return this.router.listen(28877, 'localhost');
+        return this.router.listen(EmulatorConfiguration.getInstance().EmulatorApplicationPort, 'localhost');
     }
 
     public stop() {

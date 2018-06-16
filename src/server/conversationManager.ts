@@ -108,7 +108,7 @@ export class Conversation {
     /**
      * Sends the activity to the conversation's bot.
      */
-    postActivityToBot(activity: IActivity, recordInConversation: boolean, cb?) {
+    postActivityToBot(activity: IMessageActivity, recordInConversation: boolean, cb?) {
         // Do not make a shallow copy here before modifying
         this.postage(this.botId, activity);
         activity.from = this.getCurrentUser();
@@ -118,11 +118,18 @@ export class Conversation {
         const bot = getSettings().botById(this.botId);
         if (bot) {
             // bypass ngrok url for localhost because ngrok will rate limit
-            if (utils.isLocalhostUrl(bot.botUrl))
+            if (utils.isLocalhostUrl(bot.botUrl)) {
                 activity.serviceUrl = emulator.framework.localhostServiceUrl;
-            else
+            }                
+            else {
                 activity.serviceUrl = emulator.framework.serviceUrl;
+            }
 
+            //Бот не может десериализовать activity поскольку чат возвращает не понятный объект. Обнуляем entities 
+            if (activity.type == "message") {
+                activity.entities = null;
+            }
+            
             let options: request.OptionsWithUrl = {
                 url: bot.botUrl + "?botid=" + this.botid,
                 method: "POST",
@@ -130,7 +137,6 @@ export class Conversation {
                 agent: emulator.proxyAgent,
                 strictSSL: false
             };
-            console.log(`Post to: ${options.url}`);
             
             let responseCallback = (err, resp: http.IncomingMessage, body) => {
                 let messageActivity: IMessageActivity = activity;
@@ -155,7 +161,7 @@ export class Conversation {
                             log.error("Error: The bot's MSA appId or password is incorrect.");
                             log.error(log.botCredsConfigurationLink('Click here'), "to edit your bot's MSA info.");
                         }
-                        cb(err, resp ? resp.statusCode : undefined);
+                        cb(err, resp ? resp.statusCode : undefined, null, resp);
                     } else {
                         log.info(
                             '->',
@@ -166,7 +172,7 @@ export class Conversation {
                         if (recordInConversation) {
                             this.activities.push(Object.assign({}, activity));
                         }
-                        cb(null, resp.statusCode, activity.id);
+                        cb(null, resp.statusCode, activity.id, resp);
                     }
                 }
             }
