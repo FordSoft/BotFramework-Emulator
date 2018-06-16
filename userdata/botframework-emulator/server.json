@@ -21,15 +21,15 @@
     "top": 50
   },
   "users": {
-    "currentUserId": "John Doe",
+    "currentUserId": "Virtual user",
     "usersById": {
       "default-user": {
         "id": "default-user",
         "name": "User"
       },
-      "John Doe": {
-        "id": "John Doe",
-        "name": "John Doe"
+      "Virtual user": {
+        "id": "Virtual user",
+        "name": "Virtual user"
       }
     }
   }
